@@ -20,6 +20,7 @@ var (
 	dbName        = flag.String("database", "", "Db name")
 	dbUser        = flag.String("user", "nsapp", "Db user")
 	dbPass        = flag.String("pass", "", "Db pass")
+	printOnly     = flag.Bool("print", false, "Do not apply missing migrations, print script names only")
 	migrationsDir = flag.String("folder", ".", "Migrations folder")
 	versionTable  = flag.String("TVersion", "TVersion", "Version table name")
 	verbose       = flag.Bool("v", false, "verbose")
@@ -169,7 +170,11 @@ func main() {
 			continue
 		}
 
+		if *printOnly {
+			log.Printf("to be applied: \"%s\"", script.Name)
+			continue
+		}
+
 		// exec migration
-		log.Printf("applying \"%s\"", script.Name)
 	}
 }
