@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -29,12 +30,14 @@ var (
 var (
 	versionsQuery       = fmt.Sprintf("SELECT TVer_FileName FROM %s", *versionTable)
 	regexUseDatabase    = regexp.MustCompile(`^\s*(?i)use\s+([[:alnum:]])+\s*$`)
+	regexScriptNumber   = regexp.MustCompile(`^([[:digit:]]+)_`)
 	supportedScriptExts = map[string]bool{".sql": true, ".txt": true}
 )
 
 type SqlScript struct {
 	Db        string
 	Name      string
+	Number    int
 	Content   string
 	Installed bool
 }
@@ -68,6 +71,15 @@ func loadMigrations(dir string) (scripts []SqlScript, err error) {
 			// left-trim zeroes from scriptName, file name is inconsistant with db version
 			Name:    strings.TrimLeft(scriptName, "0"),
 			Content: string(buf),
+		}
+
+		// extract script number from script name
+		if regexScriptNumber.MatchString(script.Name) {
+			nbString := string(regexScriptNumber.FindSubmatch([]byte(script.Name))[1])
+			script.Number, err = strconv.Atoi(nbString)
+			if err != nil {
+				log.Printf("couldn't extract script number from \"%s\": %s", script.Name, err)
+			}
 		}
 
 		// do we have a "USE" clause ?
