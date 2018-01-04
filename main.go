@@ -24,6 +24,8 @@ var (
 	dbPass        = flag.String("pass", "", "Db pass")
 	startAt       = flag.Int("startAt", 0, "Only apply migrations that have number >= to this value")
 	stopAt        = flag.Int("stopAt", 0, "Only apply migrations that have number < to this value")
+	noPrompt      = flag.Bool("noPrompt", false, "Disable prompt")
+	continueOnErr = flag.Bool("continueOnError", false, "Continue on error (only with -noPrompt)")
 	printOnly     = flag.Bool("print", false, "Do not apply missing migrations, print script names only")
 	migrationsDir = flag.String("folder", ".", "Migrations folder")
 	versionTable  = flag.String("TVersion", "TVersion", "Version table name")
@@ -178,7 +180,7 @@ func main() {
 			continue
 		}
 
-		log.Printf("script: \"%s\"", script.Name)
+		log.Printf("applying: \"%s\"", script.Name)
 		if *printOnly {
 			continue
 		}
@@ -186,12 +188,16 @@ func main() {
 		rd := bufio.NewReader(os.Stdin)
 
 	prompt:
-		fmt.Printf("run script? (Y)es, (n)o, (q)uit, (d)isplay: ")
-		b, _, err := rd.ReadLine()
-		if err != nil {
-			log.Fatal(err)
-		} else if len(b) == 0 {
-			// default continue
+		var b []byte
+		if !*noPrompt {
+			fmt.Printf("run script? (Y)es, (n)o, (q)uit, (d)isplay: ")
+			b, _, err = rd.ReadLine()
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+
+		if len(b) == 0 {
 			b = []byte{'Y'}
 		}
 
@@ -212,8 +218,12 @@ func main() {
 
 		_, err = script.Execute(db)
 		if err != nil {
-			log.Println(err)
-			fmt.Fprint(os.Stderr, "continue? y/N: ")
+			log.Println(err, "\n")
+			if *continueOnErr {
+				continue
+			}
+
+			fmt.Fprint(os.Stderr, "\ncontinue to next script? y/N: ")
 			b, _, err := rd.ReadLine()
 			if err != nil {
 				log.Fatal(err)
@@ -222,6 +232,8 @@ func main() {
 			if len(b) == 0 || (strings.ToUpper(string(b))[0] != 'Y') {
 				os.Exit(1)
 			}
+		} else {
+			log.Println("OK")
 		}
 	}
 }

@@ -2,7 +2,9 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
+	"os"
 	"strings"
 )
 
@@ -20,6 +22,24 @@ type QueryResult struct {
 	result sql.Result
 }
 
+// parseStatements tries to extract each subquery in s.Content
+// by splitting them between "GO" instruction.
+func (s SqlScript) ParseStatements() []string {
+	var stmts []string
+	var stmt string
+
+	lines := strings.Split(s.Content, "\n")
+	for _, line := range lines {
+		if strings.ToUpper(strings.TrimSpace(line)) == "GO" {
+			stmts = append(stmts, stmt)
+			stmt = ""
+			continue
+		}
+		stmt += fmt.Sprintln(line)
+	}
+	return stmts
+}
+
 func (s SqlScript) Execute(conn *sql.DB) ([]QueryResult, error) {
 	txn, err := conn.Begin()
 	if err != nil {
@@ -27,17 +47,18 @@ func (s SqlScript) Execute(conn *sql.DB) ([]QueryResult, error) {
 	}
 
 	results := []QueryResult{}
-	for _, query := range strings.Split(s.Content, "GO") {
+	for i, query := range s.ParseStatements() {
 		var r QueryResult
 		r.query = query
 		r.result, r.err = txn.Exec(r.query)
 		results = append(results, r)
 
 		if *verbose {
-			log.Println("SQL>\n", r.query)
+			log.Printf("%d> %s", i, r.query)
 		}
 
 		if r.err != nil {
+			_ = txn.Rollback()
 			return results, r.err
 		}
 
@@ -51,9 +72,13 @@ func (s SqlScript) Execute(conn *sql.DB) ([]QueryResult, error) {
 			if err == nil {
 				log.Printf("last insert id: %d", i)
 			}
+			fmt.Fprintln(os.Stderr)
 		}
 	}
 
 	err = txn.Commit()
+	if err != nil {
+		_ = txn.Rollback()
+	}
 	return results, err
 }
