@@ -70,11 +70,9 @@ func loadMigrations(dir string) (scripts []SqlScript, err error) {
 			Content: string(buf),
 		}
 
+		// do we have a "USE" clause ?
 		if regexUseDatabase.Match(buf) {
-			matches := regexUseDatabase.FindSubmatch(buf)
-			if matches != nil && len(matches) > 1 {
-				script.Db = string(matches[1])
-			}
+			script.Db = string(regexUseDatabase.FindSubmatch(buf)[1])
 		}
 
 		scripts = append(scripts, script)
