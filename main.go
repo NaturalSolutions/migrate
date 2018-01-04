@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"database/sql"
 	"flag"
 	"fmt"
@@ -22,6 +23,7 @@ var (
 	dbUser        = flag.String("user", "nsapp", "Db user")
 	dbPass        = flag.String("pass", "", "Db pass")
 	startAt       = flag.Int("startAt", 0, "Only apply migrations that have number >= to this value")
+	stopAt        = flag.Int("stopAt", 0, "Only apply migrations that have number < to this value")
 	printOnly     = flag.Bool("print", false, "Do not apply missing migrations, print script names only")
 	migrationsDir = flag.String("folder", ".", "Migrations folder")
 	versionTable  = flag.String("TVersion", "TVersion", "Version table name")
@@ -35,15 +37,7 @@ var (
 	supportedScriptExts = map[string]bool{".sql": true, ".txt": true}
 )
 
-type SqlScript struct {
-	Db        string
-	Name      string
-	Number    int
-	Content   string
-	Installed bool
-}
-
-func loadMigrations(dir string, startId int) (scripts []SqlScript, err error) {
+func loadMigrations(dir string, startId int, stopId int) (scripts []SqlScript, err error) {
 	fis, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return nil, err
@@ -88,8 +82,8 @@ func loadMigrations(dir string, startId int) (scripts []SqlScript, err error) {
 			script.Db = string(regexUseDatabase.FindSubmatch(buf)[1])
 		}
 
-		// only add after startId
-		if script.Number >= startId {
+		// only add between startId & stopId
+		if script.Number >= startId && (stopId <= 0 || script.Number < stopId) {
 			scripts = append(scripts, script)
 		}
 	}
@@ -168,7 +162,7 @@ func main() {
 	log.Printf("found %d installed migrations in db \"%s\"", i, *dbName)
 
 	// load migration scripts from migrations folder
-	sqlScripts, err := loadMigrations(*migrationsDir, *startAt)
+	sqlScripts, err := loadMigrations(*migrationsDir, *startAt, *stopAt)
 	if err != nil {
 		log.Fatalf("error loading migrations: %s", err)
 	}
@@ -184,11 +178,50 @@ func main() {
 			continue
 		}
 
+		log.Printf("script: \"%s\"", script.Name)
 		if *printOnly {
-			log.Printf("to be applied: \"%s\"", script.Name)
 			continue
 		}
 
-		// exec migration
+		rd := bufio.NewReader(os.Stdin)
+
+	prompt:
+		fmt.Printf("run script? (Y)es, (n)o, (q)uit, (d)isplay: ")
+		b, _, err := rd.ReadLine()
+		if err != nil {
+			log.Fatal(err)
+		} else if len(b) == 0 {
+			// default continue
+			b = []byte{'Y'}
+		}
+
+		switch strings.ToUpper(string(b))[0] {
+		case 'Y':
+			break
+		case 'N':
+			continue
+		case 'Q':
+			os.Exit(0)
+		case 'D':
+			fmt.Fprintln(os.Stderr, script.Content)
+			fallthrough
+		default:
+			fmt.Println()
+			goto prompt
+		}
+
+		_, err = script.Execute(db)
+		if err != nil {
+			log.Println(err)
+			fmt.Fprint(os.Stderr, "continue? y/N: ")
+			b, _, err := rd.ReadLine()
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			if len(b) == 0 || (strings.ToUpper(string(b))[0] != 'Y') {
+				os.Exit(1)
+			}
+		}
 	}
 }
