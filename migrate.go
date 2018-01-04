@@ -21,6 +21,7 @@ var (
 	dbName        = flag.String("database", "", "Db name")
 	dbUser        = flag.String("user", "nsapp", "Db user")
 	dbPass        = flag.String("pass", "", "Db pass")
+	startAt       = flag.Int("startAt", 0, "Only apply migrations that have number >= to this value")
 	printOnly     = flag.Bool("print", false, "Do not apply missing migrations, print script names only")
 	migrationsDir = flag.String("folder", ".", "Migrations folder")
 	versionTable  = flag.String("TVersion", "TVersion", "Version table name")
@@ -42,7 +43,7 @@ type SqlScript struct {
 	Installed bool
 }
 
-func loadMigrations(dir string) (scripts []SqlScript, err error) {
+func loadMigrations(dir string, startId int) (scripts []SqlScript, err error) {
 	fis, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return nil, err
@@ -87,7 +88,10 @@ func loadMigrations(dir string) (scripts []SqlScript, err error) {
 			script.Db = string(regexUseDatabase.FindSubmatch(buf)[1])
 		}
 
-		scripts = append(scripts, script)
+		// only add after startId
+		if script.Number >= startId {
+			scripts = append(scripts, script)
+		}
 	}
 
 	return scripts, nil
@@ -164,7 +168,7 @@ func main() {
 	log.Printf("found %d installed migrations in db \"%s\"", i, *dbName)
 
 	// load migration scripts from migrations folder
-	sqlScripts, err := loadMigrations(*migrationsDir)
+	sqlScripts, err := loadMigrations(*migrationsDir, *startAt)
 	if err != nil {
 		log.Fatalf("error loading migrations: %s", err)
 	}
