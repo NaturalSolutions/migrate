@@ -54,7 +54,7 @@ func loadMigrations(dir string) (scripts []SqlScript, err error) {
 		fext := filepath.Ext(fi.Name())
 		if !supportedScriptExts[fext] {
 			if *verbose {
-				log.Printf("skipping file with unsupported extension: %s, %s", fi.Name(), fext)
+				log.Printf("skipping file with unsupported extension \"%s\"", fi.Name())
 			}
 			continue
 		}
@@ -62,7 +62,7 @@ func loadMigrations(dir string) (scripts []SqlScript, err error) {
 		fpath := filepath.Join(dir, fi.Name())
 		buf, err := ioutil.ReadFile(fpath)
 		if err != nil {
-			log.Printf("readfile %s: %s", fpath, err)
+			log.Printf("readfile \"%s\": %s", fpath, err)
 			continue
 		}
 
