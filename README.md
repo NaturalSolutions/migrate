@@ -42,4 +42,6 @@ Usage of C:\Users\NaturalUser\home\go\bin\migrate.exe:
   -user string
         Db user (default "nsapp")
   -v    verbose
+  -version
+        Print version & exit
 ```

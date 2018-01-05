@@ -9,11 +9,14 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 )
+
+const VERSION = "v0.1"
 
 var (
 	dbScheme      = flag.String("scheme", "mssql", "DBMS scheme")
@@ -29,7 +32,8 @@ var (
 	printOnly     = flag.Bool("print", false, "Do not apply missing migrations, print script names only")
 	migrationsDir = flag.String("folder", ".", "Migrations folder")
 	versionTable  = flag.String("TVersion", "TVersion", "Version table name")
-	verbose       = flag.Bool("v", false, "verbose")
+	verbose       = flag.Bool("v", false, "Verbose")
+	version       = flag.Bool("version", false, "Print version & exit")
 )
 
 var (
@@ -132,6 +136,12 @@ func usage(reason string) {
 
 func init() {
 	flag.Parse()
+	if *version {
+		name, _ := os.Executable()
+		fmt.Printf("%s %s\n", path.Base(name), VERSION)
+		os.Exit(0)
+	}
+
 	if len(*dbPass) == 0 {
 		usage("-pass required")
 	}
