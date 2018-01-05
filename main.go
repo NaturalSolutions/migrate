@@ -33,7 +33,7 @@ var (
 )
 
 var (
-	versionsQuery       = fmt.Sprintf("SELECT TVer_FileName FROM %s", *versionTable)
+	versionsQuery       = "SELECT TVer_FileName FROM %s"
 	regexUseDatabase    = regexp.MustCompile(`^\s*(?i)use\s+([[:alnum:]])+\s*$`)
 	regexScriptNumber   = regexp.MustCompile(`^([[:digit:]]+)_`)
 	supportedScriptExts = map[string]bool{".sql": true, ".txt": true}
@@ -138,6 +138,7 @@ func init() {
 	if len(*dbName) == 0 {
 		usage("-database required")
 	}
+	versionsQuery = fmt.Sprintf(versionsQuery, *versionTable)
 }
 
 func main() {
