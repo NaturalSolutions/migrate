@@ -163,6 +163,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("error opening db: %s", err)
 	}
+	defer db.Close()
+
 	err = db.Ping()
 	if err != nil {
 		log.Fatalf("error connecting to db: %s", err)
