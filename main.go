@@ -181,6 +181,8 @@ func main() {
 		log.Fatalf("error loading migrations: %s", err)
 	}
 
+	errors := false
+
 	for _, script := range sqlScripts {
 		if dbMigrations[script.Name] {
 			if *verbose {
@@ -236,6 +238,7 @@ func main() {
 		if err != nil {
 			log.Println(err, "\n")
 			if *continueOnErr {
+				errors = true
 				continue
 			}
 
@@ -251,5 +254,9 @@ func main() {
 		} else {
 			log.Println("OK")
 		}
+	}
+
+	if errors {
+		os.Exit(1)
 	}
 }
