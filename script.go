@@ -40,7 +40,7 @@ func (s SqlScript) ParseStatements() []string {
 	return stmts
 }
 
-func (s SqlScript) Execute(conn *sql.DB) ([]QueryResult, error) {
+func (s SqlScript) Execute(conn *sql.DB, noCommit bool) ([]QueryResult, error) {
 	txn, err := conn.Begin()
 	if err != nil {
 		return nil, err
@@ -74,6 +74,11 @@ func (s SqlScript) Execute(conn *sql.DB) ([]QueryResult, error) {
 			}
 			fmt.Fprintln(os.Stderr)
 		}
+	}
+
+	if noCommit {
+		txn.Rollback()
+		return results, err
 	}
 
 	err = txn.Commit()

@@ -30,6 +30,7 @@ var (
 	noPrompt      = flag.Bool("noPrompt", false, "Disable prompt")
 	continueOnErr = flag.Bool("continueOnError", false, "Continue on error (only with -noPrompt)")
 	printOnly     = flag.Bool("print", false, "Do not apply missing migrations, print script names only")
+	fake          = flag.Bool("fake", false, "Only check migration validity, no commit, no db change (only with -noPrompt)")
 	migrationsDir = flag.String("folder", ".", "Migrations folder")
 	versionTable  = flag.String("TVersion", "TVersion", "Version table name")
 	verbose       = flag.Bool("v", false, "Verbose")
@@ -201,7 +202,7 @@ func main() {
 	prompt:
 		var b []byte
 		if !*noPrompt {
-			fmt.Printf("run script? (Y)es, (n)o, (q)uit, (d)isplay: ")
+			fmt.Printf("run script? (Y)es, (n)o, (q)uit, (d)isplay, (f)ake (no db change): ")
 			b, _, err = rd.ReadLine()
 			if err != nil {
 				log.Fatal(err)
@@ -212,6 +213,7 @@ func main() {
 			b = []byte{'Y'}
 		}
 
+		var noCommit = *fake
 		switch strings.ToUpper(string(b))[0] {
 		case 'Y':
 			break
@@ -219,6 +221,8 @@ func main() {
 			continue
 		case 'Q':
 			os.Exit(0)
+		case 'F':
+			noCommit = true
 		case 'D':
 			fmt.Fprintln(os.Stderr, script.Content)
 			fallthrough
@@ -227,7 +231,7 @@ func main() {
 			goto prompt
 		}
 
-		_, err = script.Execute(db)
+		_, err = script.Execute(db, noCommit)
 		if err != nil {
 			log.Println(err, "\n")
 			if *continueOnErr {
