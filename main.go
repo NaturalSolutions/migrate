@@ -192,10 +192,11 @@ func main() {
 			continue
 		}
 
-		log.Printf("applying: \"%s\"", script.Name)
 		if *printOnly {
+			log.Printf("to be applied: \"%s\"", script.Name)
 			continue
 		}
+		log.Printf("applying: \"%s\"", script.Name)
 
 		rd := bufio.NewReader(os.Stdin)
 
