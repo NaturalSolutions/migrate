@@ -153,6 +153,11 @@ func init() {
 		usage("-database required")
 	}
 	versionsQuery = fmt.Sprintf(versionsQuery, *versionTable)
+
+	if *verbose {
+		// insert file name & line number to log prefix
+		log.SetFlags(log.LstdFlags | log.Lshortfile)
+	}
 }
 
 func main() {
