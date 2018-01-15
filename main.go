@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
+	"github.com/denisenkom/go-mssqldb"
 	_ "github.com/denisenkom/go-mssqldb"
 	"io/ioutil"
 	"log"
@@ -25,12 +26,14 @@ var (
 	dbName        = flag.String("database", "", "Db name")
 	dbUser        = flag.String("user", "nsapp", "Db user")
 	dbPass        = flag.String("pass", "", "Db pass")
+	initVersion   = flag.Bool("init", false, "Create versions table & exit")
 	startAt       = flag.Int("startAt", 0, "Only apply migrations that have number >= to this value")
 	stopAt        = flag.Int("stopAt", 0, "Only apply migrations that have number < to this value")
 	noPrompt      = flag.Bool("noPrompt", false, "Disable prompt")
 	continueOnErr = flag.Bool("continueOnError", false, "Continue on error (only with -noPrompt)")
 	printOnly     = flag.Bool("print", false, "Do not apply missing migrations, print script names only")
 	fake          = flag.Bool("fake", false, "Only check migration validity, no commit, no db change (only with -noPrompt)")
+	noUpVersion   = flag.Bool("noUpVersion", false, "Do not insert installed script in TVersion table, do it manually or in script")
 	migrationsDir = flag.String("folder", ".", "Migrations folder")
 	versionTable  = flag.String("TVersion", "TVersion", "Version table name")
 	verbose       = flag.Bool("v", false, "Verbose")
@@ -170,6 +173,23 @@ func main() {
 		log.Fatalf("error connecting to db: %s", err)
 	}
 
+	// create version table if -init flag
+	if *initVersion {
+		err = CreateVersionTable(db, *versionTable)
+		if err != nil {
+			log.Fatalf("error creating versions table: %s", err)
+		}
+		log.Printf("successfuly created \"%s\" version table", *versionTable)
+		os.Exit(0)
+	}
+
+	// check that versions table exist and passes integrity check
+	err = CheckVersionTable(db, *versionTable)
+	if err != nil {
+		log.Printf("error checking versions table: %s", err)
+		log.Fatal("try -init flag?")
+	}
+
 	// fetch all versions from db
 	i, dbMigrations, err := getDbVersions(db)
 	if err != nil {
@@ -254,6 +274,22 @@ func main() {
 				os.Exit(1)
 			}
 		} else {
+			if !*noUpVersion {
+				err = script.InsertVersion(db, *versionTable)
+				if err != nil {
+					log.Printf("error inserting script into \"%s\" version table: %s", *versionTable, err)
+
+					// try to guess what error was made
+					if mssqlErr, ok := err.(mssql.Error); ok {
+						// 2627 is unique constraint violation
+						if mssqlErr.Number == 2627 {
+							log.Println("use -noUpVersion flag?")
+						}
+					}
+
+					os.Exit(1)
+				}
+			}
 			log.Println("OK")
 		}
 	}

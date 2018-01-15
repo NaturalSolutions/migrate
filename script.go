@@ -87,3 +87,7 @@ func (s SqlScript) Execute(conn *sql.DB, noCommit bool) ([]QueryResult, error) {
 	}
 	return results, err
 }
+
+func (s SqlScript) InsertVersion(conn *sql.DB, versionTable string) error {
+	return InsertNewVersion(conn, versionTable, s.Name)
+}
