@@ -37,6 +37,12 @@ func (s SqlScript) ParseStatements() []string {
 		}
 		stmt += fmt.Sprintln(line)
 	}
+
+	// allow ommission of "GO" for the last statement
+	if len(stmt) > 0 {
+		stmts = append(stmts, stmt)
+	}
+
 	return stmts
 }
 
