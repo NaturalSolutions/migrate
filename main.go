@@ -32,8 +32,9 @@ var (
 	noPrompt      = flag.Bool("noPrompt", false, "Disable prompt")
 	continueOnErr = flag.Bool("continueOnError", false, "Continue on error (only with -noPrompt)")
 	printOnly     = flag.Bool("print", false, "Do not apply missing migrations, print script names only")
-	fake          = flag.Bool("fake", false, "Only check migration validity, no commit, no db change (only with -noPrompt)")
-	noUpVersion   = flag.Bool("noUpVersion", false, "Do not insert installed script in TVersion table, do it manually or in script")
+	fake          = flag.Bool("fake", false, "Check that script executes correctly but systematically rollback (no db change)")
+	noScript      = flag.Bool("noScript", false, "Do not run migration but mark it as installed in TVersion")
+	noUpVersion   = flag.Bool("noUpVersion", false, "Run migration but do not mark it as installed in TVersion")
 	migrationsDir = flag.String("folder", ".", "Migrations folder")
 	versionTable  = flag.String("TVersion", "TVersion", "Version table name")
 	verbose       = flag.Bool("v", false, "Verbose")
@@ -152,6 +153,9 @@ func init() {
 	if len(*dbName) == 0 {
 		usage("-database required")
 	}
+	if *noUpVersion && *noScript {
+		usage("wut? -noScript and -noUpVersion flags are mutually exclusive")
+	}
 	versionsQuery = fmt.Sprintf(versionsQuery, *versionTable)
 
 	if *verbose {
@@ -232,7 +236,7 @@ func main() {
 	prompt:
 		var b []byte
 		if !*noPrompt {
-			fmt.Printf("run script? (Y)es, (n)o, (q)uit, (d)isplay, (f)ake (no db change): ")
+			fmt.Printf("run script? (Y)es, (n)o, (q)uit, (d)isplay, (f)ake (no db change), (s)hallow (do not run script but upgrade version): ")
 			b, _, err = rd.ReadLine()
 			if err != nil {
 				log.Fatal(err)
@@ -243,7 +247,8 @@ func main() {
 			b = []byte{'Y'}
 		}
 
-		var noCommit = *fake
+		var bFake = *fake
+		var bNoScript = *noScript
 		switch strings.ToUpper(string(b))[0] {
 		case 'Y':
 			break
@@ -252,7 +257,9 @@ func main() {
 		case 'Q':
 			os.Exit(0)
 		case 'F':
-			noCommit = true
+			bFake = true
+		case 'S':
+			bNoScript = true
 		case 'D':
 			fmt.Fprintln(os.Stderr, script.Content)
 			fallthrough
@@ -261,7 +268,11 @@ func main() {
 			goto prompt
 		}
 
-		_, err = script.Execute(db, noCommit)
+		// skip script execution?
+		if !bNoScript {
+			_, err = script.Execute(db, bFake)
+		}
+
 		if err != nil {
 			log.Println(err, "\n")
 			if *continueOnErr {
@@ -279,7 +290,8 @@ func main() {
 				os.Exit(1)
 			}
 		} else {
-			if !*noUpVersion {
+			// do not upgrade version in case "-fake" or "-noUpVersion" was specified
+			if !*noUpVersion && !bFake {
 				err = script.InsertVersion(db, *versionTable)
 				if err != nil {
 					log.Printf("error inserting script into \"%s\" version table: %s", *versionTable, err)
@@ -295,7 +307,13 @@ func main() {
 					os.Exit(1)
 				}
 			}
-			log.Println("OK")
+			okmsg := "OK"
+			if bFake {
+				okmsg += " (fake)"
+			} else if bNoScript {
+				okmsg += " (up version only)"
+			}
+			log.Println(okmsg)
 		}
 	}
 
